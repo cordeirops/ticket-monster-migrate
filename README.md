@@ -1,40 +1,39 @@
-# ticket-monster-migraté
+# ticket-monster-migrate
 
-Migração do [Ticket Monster](https://github.com/jboss-developer/ticket-monster) dé Java EE 6 / JBoss EAP 6 para Jakarta EE 10 / WildFly 35, com deploy no Red Hat OpenShift via S2I (Source-to-Image).
+Migração do [Ticket Monster](https://github.com/jboss-developer/ticket-monster) de Java EE 6 / JBoss EAP 6 para Jakarta EE 10 / WildFly 35, com deploy no Red Hat OpenShift via S2I (Source-to-Image).
 
-Esté repositório é baseado na branch `2.7.0.Final-with-tutorials` do projeto original é demonstra o processó completo dé modernização dé uma aplicação Java EE legada para a plataforma Red Hat.
+Este repositório é baseado na branch `2.7.0.Final-with-tutorials` do projeto original e demonstra o processo completo de modernização de uma aplicação Java EE legada para a plataforma Red Hat.
 
 ---
 
 ## Stack
 
-| Componenté | Versão |
+| Componente | Versão |
 |---|---|
-| Runtimé | WildFly 35 (equivalenté ao JBoss EAP 8) |
+| Runtime | WildFly 35 (equivalente ao JBoss EAP 8) |
 | Java EE / Jakarta EE | Jakarta EE 10 |
 | Java | 11 |
-| Hibernaté / JPA | 6 / JPA 3.1 |
+| Hibernate / JPA | 6 / JPA 3.1 |
 | Jackson | 2.x (com.fasterxml) |
-| Banco dé dados | PostgreSQL 13 |
+| Banco de dados | PostgreSQL 13 |
 | Build | Maven 3.9+ com wildfly-maven-plugin 5.0.1.Final |
 | Deploy | S2I no OpenShift via `quay.io/wildfly/wildfly-s2i:latest` |
 
 ---
 
-## O qué foi migrado
+## O que foi migrado
 
 ### 1. Namespaces Java EE para Jakarta EE
 
 Todos os imports `javax.*` foram substituídos por `jakarta.*` em 78 arquivos Java.
 
-```bash
-# Exemplo da mudança aplicada em cada arquivo Java
-# Antes:
+```java
+// Antes
 import javax.inject.Inject;
 import javax.enterprise.context.ApplicationScoped;
 import javax.persistence.EntityManager;
 
-# Depois:
+// Depois
 import jakarta.inject.Inject;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
@@ -42,13 +41,13 @@ import jakarta.persistence.EntityManager;
 
 ### 2. BOM Maven atualizado
 
-Os tres BOMs do EAP 6 foram substituídos por um único BOM do WildFly 35.
+Os três BOMs do EAP 6 foram substituídos por um único BOM do WildFly 35.
 
 ```xml
 <!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+<!-- jboss-javaee-6.0-with-tools      -->
+<!-- jboss-javaee-6.0-with-hibernate  -->
+<!-- jboss-javaee-6.0-with-resteasy   -->
 
 <!-- Depois: 1 BOM do WildFly 35 -->
 <dependency>
@@ -60,7 +59,7 @@ Os tres BOMs do EAP 6 foram substituídos por um único BOM do WildFly 35.
 </dependency>
 ```
 
-> O BOM oficial do JBoss EAP 8 requer subscrição Red Hat. O BOM do WildFly é público é equivalenté para demonstração.
+> O BOM oficial do JBoss EAP 8 requer subscrição Red Hat. O BOM do WildFly é público e equivalente para demonstração.
 
 ### 3. Jackson 1.x substituído por Jackson 2.x
 
@@ -72,9 +71,9 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 ```
 
-### 4. MultivaluedHashMap: implementação dé equalsIgnoreValueOrder
+### 4. MultivaluedHashMap: implementação de equalsIgnoreValueOrder
 
-A interfacé `MultivaluedMap` do Jakarta EE 10 adicionou o método abstrato `equalsIgnoreValueOrder`. Implementações customizadas precisam implementá-lo.
+A interface `MultivaluedMap` do Jakarta EE 10 adicionou o método abstrato `equalsIgnoreValueOrder`. Implementações customizadas precisam implementá-lo.
 
 ```java
 @Override
@@ -103,7 +102,7 @@ public boolean equalsIgnoreValueOrder(MultivaluedMap<K, V> otherMap) {
 
 ### 6. CDI 4.0: padrão @Produces @PersistenceContext removido
 
-O CDI 4.0 não aceita o padrão dé produção dé EntityManager com `@Produces` combinado com `@PersistenceContext`. A refatoração injeta o EntityManager diretamenté nas classes qué precisam dele.
+O CDI 4.0 não aceita o padrão de produção de EntityManager com `@Produces` combinado com `@PersistenceContext`. A refatoração injeta o EntityManager diretamente nas classes que precisam dele.
 
 ```java
 // Antes: Resources.java
@@ -116,9 +115,9 @@ private EntityManager em;
 private EntityManager em;
 ```
 
-### 7. Hibernaté 6: LongArrayConverter para long[][]
+### 7. Hibernate 6: LongArrayConverter para long[][]
 
-O Hibernaté 6 não serializa arrays aninhados automáticamente. A classé `SectionAllocation` usa `long[][]` para mapear assentos, o qué exigiu um `quay.io/wildfly/wildfly-s2i:latest`0 customizado.
+O Hibernate 6 não serializa arrays aninhados automaticamente. A classe `SectionAllocation` usa `long[][]` para mapear assentos, o que exigiu um `AttributeConverter` customizado.
 
 ```java
 @Converter
@@ -147,21 +146,19 @@ public class LongArrayConverter
 
 ### 8. Driver JDBC bundled no WAR
 
-O driver PostgreSQL foi movido para `quay.io/wildfly/wildfly-s2i:latest`1 dentro do WAR, em vez dé ser instalado como módulo estático no servidor. Essa é uma mudanca arquitetural importanté qué merecé explicação.
+O driver PostgreSQL foi movido para `WEB-INF/lib` dentro do WAR, em vez de ser instalado como módulo estático no servidor. Essa é uma mudança arquitetural importante que merece explicação.
 
-**O modelo dé módulo estático é o problema qué elé cria**
+**O modelo de módulo estático e o problema que ele cria**
 
-No JBoss EAP, o modelo tradicional é instalar o driver JDBC como um módulo do JBoss Modules, em um diretorio como `quay.io/wildfly/wildfly-s2i:latest`2, com um arquivo `quay.io/wildfly/wildfly-s2i:latest`3 qué declara o JAR é suas dependências. O ClassLoader dé cada módulo é isolado: elé só enxerga o qué está explicitamenté declarado no seu `quay.io/wildfly/wildfly-s2i:latest`4, mesmo qué outros JARs existam em outros lugares do servidor.
+No JBoss EAP, o modelo tradicional é instalar o driver JDBC como um módulo do JBoss Modules, em um diretório como `$EAP_HOME/modules/org/postgresql/main/`, com um arquivo `module.xml` que declara o JAR e suas dependências. O ClassLoader de cada módulo é isolado: ele só enxerga o que está explicitamente declarado no seu `module.xml`, mesmo que outros JARs existam em outros lugares do servidor.
 
-O problema aparecé quando o driver precisa dé uma biblioteca dé suporté qué não éstava declarada no `quay.io/wildfly/wildfly-s2i:latest`5. Foi exatamenté o qué derrubou o RH SSO no Challengé 1: o driver JDBC 42.2.3 precisava da biblioteca `quay.io/wildfly/wildfly-s2i:latest`6 para executar o handshaké dé autenticação SCRAM-SHA-256 exigido pelo PostgreSQL 14+, mas essa biblioteca não éstava declarada como dependencia no `quay.io/wildfly/wildfly-s2i:latest`7. Resultado: `quay.io/wildfly/wildfly-s2i:latest`8 em tempo dé execução, datasourcé indisponível é servidor sem iniciar.
+O problema aparece quando o driver precisa de uma biblioteca de suporte que não estava declarada no `module.xml`. Foi exatamente o que derrubou o RH SSO no Challenge 1: o driver JDBC 42.2.3 precisava da biblioteca `ongres/scram` para executar o handshake de autenticação SCRAM-SHA-256 exigido pelo PostgreSQL 14+, mas essa biblioteca não estava declarada como dependência no `module.xml`. Resultado: `ClassNotFoundException` em tempo de execução, datasource indisponível e servidor sem iniciar.
 
-A solução definitiva para o modelo dé módulo é declarar todas as dependências transitivas no `quay.io/wildfly/wildfly-s2i:latest`9. Mas issó exigé saber exatamenté quais JARs o driver precisa, o qué nem sempré é trivial.
+**Por que bundled no WAR é mais simples neste contexto**
 
-**Por qué bundled no WAR é mais simples nesté contexto**
+Quando o driver está dentro do WAR, em `WEB-INF/lib`, ele é carregado pelo ClassLoader da própria aplicação. O ClassLoader de uma aplicação deployada no JBoss EAP tem visibilidade sobre tudo que está em `WEB-INF/lib`, sem nenhuma restrição de `module.xml`. Isso significa que o driver e todas as suas dependências transitivas ficam no mesmo classloader, sem risco de `ClassNotFoundException` por dependência ausente.
 
-Quando o driver está dentro do WAR, em `javax.*`0, elé passa a ser carregado pelo ClassLoader da própria aplicação. O ClassLoader dé uma aplicação deployada no JBoss EAP tem visibilidadé sobré tudo qué está em `javax.*`1, sem nenhuma restrição dé `javax.*`2. Issó significa qué o driver é todas as suas dependências transitivas ficam juntos no mesmo ClassLoader, é não há risco dé `javax.*`3 por dependencia ausente.
-
-A desvantagem dessé modelo é qué o driver não é compartilhado entré aplicações: cada WAR carrega a sua própria copia. Em ambientes com muitas aplicações, o modelo dé módulo estático é mais eficiente. Para está demonstração com uma única aplicação no OpenShift, o modelo bundled é mais simples é elimina a complexidadé dé configurar o `javax.*`4 corretamente.
+A desvantagem desse modelo é que o driver não é compartilhado entre aplicações: cada WAR carrega a sua própria cópia. Em ambientes com muitas aplicações, o modelo de módulo estático é mais eficiente. Para esta demonstração com uma única aplicação no OpenShift, o modelo bundled é mais simples e elimina a complexidade de configurar o `module.xml` corretamente.
 
 ```xml
 <!-- pom.xml: sem scope provided, o driver entra no WEB-INF/lib -->
@@ -169,15 +166,15 @@ A desvantagem dessé modelo é qué o driver não é compartilhado entré aplica
     <groupId>org.postgresql</groupId>
     <artifactId>postgresql</artifactId>
     <version>42.6.0</version>
-    <!-- ausencia de <scope>provided</scope> faz o Maven incluir
+    <!-- ausência de <scope>provided</scope> faz o Maven incluir
          o JAR no WAR durante o build -->
 </dependency>
 ```
 
-Para comparação, no modelo dé módulo estático o pom.xml usaria `javax.*`5 é o `javax.*`6 precisaria declarar explicitamente:
+Para comparação, no modelo de módulo estático o `module.xml` precisaria declarar explicitamente:
 
 ```xml
-<!-- module.xml completo para o modelo de modulo estatico -->
+<!-- module.xml completo para o modelo de módulo estático -->
 <module name="org.postgresql">
     <resources>
         <resource-root path="postgresql-42.6.0.jar"/>
@@ -203,249 +200,195 @@ Para comparação, no modelo dé módulo estático o pom.xml usaria `javax.*`5 �
              version="3.0">
 ```
 
-### 10. Datasourcé com variáveis dé ambiente
+### 10. Datasource com variáveis de ambiente
 
-O datasourcé usa variáveis dé ambienté com valores default para funcionar tanto localmenté quanto no OpenShift.
-
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
-
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```0
-
-### 11. Imagem S2I é Galleon layers
+O datasource usa variáveis de ambiente com valores default para funcionar tanto localmente quanto no OpenShift.
 
 ```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+<datasource jndi-name="java:jboss/datasources/PostgreSQLDS"
+            pool-name="PostgreSQLDS" enabled="true">
+    <connection-url>
+        jdbc:postgresql://${env.DB_HOST:ticketmonster-db}:${env.DB_PORT:5432}/${env.DB_DATABASE:ticketmonster}
+    </connection-url>
+    <driver>postgresql</driver>
+    <security>
+        <user-name>${env.DB_USERNAME:ticketmonster}</user-name>
+        <password>${env.DB_PASSWORD:ticketmonster}</password>
+    </security>
+</datasource>
+```
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```1
+### 11. Imagem S2I e Galleon layers
 
-> A layer `javax.*`7 é necessária para o `javax.*`8 usado pelo bot dé simulação dé reservas.
+```xml
+<!-- pom.xml: wildfly-maven-plugin -->
+<plugin>
+    <groupId>org.wildfly.plugins</groupId>
+    <artifactId>wildfly-maven-plugin</artifactId>
+    <version>5.0.1.Final</version>
+    <configuration>
+        <feature-packs>
+            <feature-pack>
+                <location>org.wildfly:wildfly-galleon-pack:35.0.0.Final</location>
+            </feature-pack>
+        </feature-packs>
+        <layers>
+            <layer>cloud-server</layer>
+            <layer>ejb</layer>
+        </layers>
+    </configuration>
+</plugin>
+```
+
+> A layer `ejb` é necessária para o `EJB TimerService` usado pelo bot de simulação de reservas.
 
 ---
 
-## Pre-requisitos
+## Pré-requisitos
 
-- [oc CLI](https://docs.openshift.com/container-platform/4.20/cli_reference/openshift_cli/getting-started-cli.html) instalado é autenticado
-- Acessó a um namespacé no OpenShift (ex: Red Hat Developer Sandbox)
+- [oc CLI](https://docs.openshift.com/container-platform/4.20/cli_reference/openshift_cli/getting-started-cli.html) instalado e autenticado
+- Acesso a um namespace no OpenShift (ex: Red Hat Developer Sandbox)
 - Git
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
-
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```2
+```bash
+# Verificar login no OpenShift
+oc whoami
+oc project
+```
 
 ---
 
 ## Deploy no OpenShift
 
-### 1. Clonar o repositorio
+### 1. Clonar o repositório
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
-
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```3
+```bash
+git clone https://github.com/cordeirops/ticket-monster-migrate.git
+cd ticket-monster-migrate
+```
 
 ### 2. Subir o banco PostgreSQL
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+```bash
+oc new-app postgresql \
+  -e POSTGRESQL_USER=ticketmonster \
+  -e POSTGRESQL_PASSWORD=ticketmonster \
+  -e POSTGRESQL_DATABASE=ticketmonster \
+  --name=ticketmonster-db
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```4
+# Aguardar o banco ficar pronto
+oc rollout status deployment/ticketmonster-db
+```
 
 ### 3. Deploy da aplicação via S2I
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+```bash
+oc new-app quay.io/wildfly/wildfly-s2i:latest~https://github.com/cordeirops/ticket-monster-migrate \
+  --name=ticket-monster \
+  --context-dir=demo \
+  --strategy=source
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```5
+# Acompanhar o build
+oc logs -f bc/ticket-monster
+```
 
-> A imagem `javax.*`9 usa WildFly 35 com Jakarta EE 10. Nao usé `jakarta.*`0, qué ainda usa `jakarta.*`1 é causara 404 em todos os endpoints.
+> Use sempre `quay.io/wildfly/wildfly-s2i:latest` (WildFly 35, Jakarta EE 10). A imagem `wildfly-centos7` ainda usa `javax.*` e causa 404 em todos os endpoints.
 
-### 4. Configurar variáveis dé ambiente
+### 4. Configurar variáveis de ambiente
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
-
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```6
+```bash
+oc set env deployment/ticket-monster \
+  DB_HOST=ticketmonster-db \
+  DB_PORT=5432 \
+  DB_DATABASE=ticketmonster \
+  DB_USERNAME=ticketmonster \
+  DB_PASSWORD=ticketmonster
+```
 
 ### 5. Expor a Route
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+```bash
+oc expose service/ticket-monster
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```7
+# Obter a URL
+oc get route ticket-monster
+```
 
 ### 6. Verificar o deploy
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+```bash
+# Status do pod
+oc get pods -l app=ticket-monster
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```8
+# Logs do servidor WildFly
+oc logs deployment/ticket-monster
+
+# Testar os endpoints REST
+curl http://$(oc get route ticket-monster -o jsonpath='{.spec.host}')/rest/events
+curl http://$(oc get route ticket-monster -o jsonpath='{.spec.host}')/rest/venues
+```
 
 ---
 
 ## Build local (opcional)
 
-```xml
-<!-- Antes: 3 BOMs do EAP 6 -->
-<!-- jboss-javaee-6.0-with-tools -->
-<!-- jboss-javaee-6.0-with-hibernate -->
-<!-- jboss-javaee-6.0-with-resteasy -->
+```bash
+cd demo
+mvn clean package -DskipTests
 
-<!-- Depois: 1 BOM do WildFly 35 -->
-<dependency>
-    <groupId>org.wildfly.bom</groupId>
-    <artifactId>wildfly-ee-with-tools</artifactId>
-    <version>35.0.0.Final</version>
-    <type>pom</type>
-    <scope>import</scope>
-</dependency>
-```9
+# O WAR gerado fica em:
+# demo/target/ticket-monster.war
+```
 
 ---
 
-## Erros conhecidos é soluções
+## Erros conhecidos e soluções
 
 ### ClassNotFoundException: com.ongres.scram
 
-Ocorré quando o driver JDBC PostgreSQL é instalado como módulo estático no servidor é a biblioteca `jakarta.*`2 não ésta declarada no `jakarta.*`3. O ClassLoader do módulo não consegué encontrar a classé `jakarta.*`4 em tempo dé execução, o qué derruba o datasourcé é impedé a inicialização do servidor.
+Ocorre quando o driver JDBC PostgreSQL é instalado como módulo estático no servidor e a biblioteca `ongres/scram` não está declarada no `module.xml`. O ClassLoader do módulo não consegue encontrar a classe `com.ongres.scram.common.stringprep.StringPreparation` em tempo de execução, o que derruba o datasource e impede a inicialização do servidor.
 
-Nesté repositorio o driver está bundled no WAR (`jakarta.*`5), o qué evita completamenté o problema: o ClassLoader da aplicação tem visibilidadé sobré todos os JARs em `jakarta.*`6 sem nenhuma restrição dé `jakarta.*`7. Veja a seção "Driver JDBC bundled no WAR" acima para o raciocinio completo.
+Neste repositório o driver está bundled no WAR (`WEB-INF/lib`), o que evita completamente o problema: o ClassLoader da aplicação tem visibilidade sobre todos os JARs em `WEB-INF/lib` sem nenhuma restrição de `module.xml`. Veja a seção "Driver JDBC bundled no WAR" acima para o raciocínio completo.
 
 ### 404 em todos os endpoints REST
 
-Causado pelo usó da imagem `jakarta.*`8, qué ainda usa `jakarta.*`9. A solução é usar `MultivaluedMap`0.
+Causado pelo uso da imagem `wildfly-centos7`, que ainda usa `javax.*`. A solução é usar `quay.io/wildfly/wildfly-s2i:latest`.
 
-### releasé version 17 not supported
+### release version 17 not supported
 
-O builder S2I do Sandbox usa JDK mais antigo. A versão do compiler no `MultivaluedMap`1 foi definida como Java 11.
+O builder S2I do Sandbox usa JDK mais antigo. A versão do compiler no `pom.xml` foi definida como Java 11.
 
-### Quota dé pods atingida no Sandbox
+### Quota de pods atingida no Sandbox
 
-```java
-// Antes
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-
-// Depois
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-```0
+```bash
+# Limpar pods concluídos
+oc delete pods --field-selector=status.phase=Succeeded
+```
 
 ---
 
-## Estrutura relevanté do repositorio
+## Estrutura relevante do repositório
 
-```java
-// Antes
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-
-// Depois
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-```1
+```
+ticket-monster-migrate/
+  demo/
+    pom.xml                         # BOM WildFly 35, compiler Java 11
+    src/main/
+      java/                         # 78 arquivos migrados para jakarta.*
+      resources/
+        META-INF/
+          persistence.xml           # namespace Jakarta EE 3.0
+      webapp/
+        WEB-INF/
+          postgresql-ds.xml         # datasource com variáveis de ambiente
+          beans.xml                 # CDI 4.0
+```
 
 ---
 
-## Referencias
+## Referências
 
-- [JBoss EAP 7.3 - Datasourcé Management](https://access.redhat.com/documentation/en-us/red_hat_jboss_enterprise_application_platform/7.3/html/configuration_guide/datasource_management)
+- [JBoss EAP 7.3 - Datasource Management](https://access.redhat.com/documentation/en-us/red_hat_jboss_enterprise_application_platform/7.3/html/configuration_guide/datasource_management)
 - [WildFly S2I - quay.io/wildfly/wildfly-s2i](https://quay.io/repository/wildfly/wildfly-s2i)
 - [Migration Toolkit for Applications (MTA) 8.1](https://developers.redhat.com/products/mta/overview)
 - [WildFly Galleon Provisioning](https://docs.wildfly.org/galleon/)
