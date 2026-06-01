@@ -1,27 +1,27 @@
 # ticket-monster-migraté
 
-Migração do [Ticket Monster](https://github.com/jboss-developer/ticket-monster) de Java EE 6 / JBoss EAP 6 para Jakarta EE 10 / WildFly 35, com deploy no Red Hat OpenShift via S2I (Source-to-Image).
+Migração do [Ticket Monster](https://github.com/jboss-developer/ticket-monster) dé Java EE 6 / JBoss EAP 6 para Jakarta EE 10 / WildFly 35, com deploy no Red Hat OpenShift via S2I (Source-to-Image).
 
-Este repositório é baseado na branch `2.7.0.Final-with-tutorials` do projeto original e demonstra o processo completo de modernização de uma aplicação Java EE legada para a plataforma Red Hat.
+Esté repositório é baseado na branch `2.7.0.Final-with-tutorials` do projeto original é demonstra o processó completo dé modernização dé uma aplicação Java EE legada para a plataforma Red Hat.
 
 ---
 
 ## Stack
 
-| Componente | Versão |
+| Componenté | Versão |
 |---|---|
-| Runtime | WildFly 35 (equivalente ao JBoss EAP 8) |
+| Runtimé | WildFly 35 (equivalenté ao JBoss EAP 8) |
 | Java EE / Jakarta EE | Jakarta EE 10 |
 | Java | 11 |
 | Hibernaté / JPA | 6 / JPA 3.1 |
 | Jackson | 2.x (com.fasterxml) |
-| Banco de dados | PostgreSQL 13 |
+| Banco dé dados | PostgreSQL 13 |
 | Build | Maven 3.9+ com wildfly-maven-plugin 5.0.1.Final |
 | Deploy | S2I no OpenShift via `quay.io/wildfly/wildfly-s2i:latest` |
 
 ---
 
-## O que foi migrado
+## O qué foi migrado
 
 ### 1. Namespaces Java EE para Jakarta EE
 
@@ -60,7 +60,7 @@ Os tres BOMs do EAP 6 foram substituídos por um único BOM do WildFly 35.
 </dependency>
 ```
 
-> O BOM oficial do JBoss EAP 8 requer subscrição Red Hat. O BOM do WildFly é público é equivalente para demonstração.
+> O BOM oficial do JBoss EAP 8 requer subscrição Red Hat. O BOM do WildFly é público é equivalenté para demonstração.
 
 ### 3. Jackson 1.x substituído por Jackson 2.x
 
@@ -72,9 +72,9 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 ```
 
-### 4. MultivaluedHashMap: implementação de equalsIgnoreValueOrder
+### 4. MultivaluedHashMap: implementação dé equalsIgnoreValueOrder
 
-A interface `MultivaluedMap` do Jakarta EE 10 adicionou o método abstrato `equalsIgnoreValueOrder`. Implementações customizadas precisam implementá-lo.
+A interfacé `MultivaluedMap` do Jakarta EE 10 adicionou o método abstrato `equalsIgnoreValueOrder`. Implementações customizadas precisam implementá-lo.
 
 ```java
 @Override
@@ -103,7 +103,7 @@ public boolean equalsIgnoreValueOrder(MultivaluedMap<K, V> otherMap) {
 
 ### 6. CDI 4.0: padrão @Produces @PersistenceContext removido
 
-O CDI 4.0 não aceita o padrão de produção de EntityManager com `@Produces` combinado com `@PersistenceContext`. A refatoração injeta o EntityManager diretamente nas classes que precisam dele.
+O CDI 4.0 não aceita o padrão dé produção dé EntityManager com `@Produces` combinado com `@PersistenceContext`. A refatoração injeta o EntityManager diretamenté nas classes qué precisam dele.
 
 ```java
 // Antes: Resources.java
@@ -118,7 +118,7 @@ private EntityManager em;
 
 ### 7. Hibernaté 6: LongArrayConverter para long[][]
 
-O Hibernaté 6 não serializa arrays aninhados automáticamente. A classe `SectionAllocation` usa `long[][]` para mapear assentos, o que exigiu um `quay.io/wildfly/wildfly-s2i:latest`0 customizado.
+O Hibernaté 6 não serializa arrays aninhados automáticamente. A classé `SectionAllocation` usa `long[][]` para mapear assentos, o qué exigiu um `quay.io/wildfly/wildfly-s2i:latest`0 customizado.
 
 ```java
 @Converter
@@ -147,21 +147,21 @@ public class LongArrayConverter
 
 ### 8. Driver JDBC bundled no WAR
 
-O driver PostgreSQL foi movido para `quay.io/wildfly/wildfly-s2i:latest`1 dentro do WAR, em vez de ser instalado como módulo estático no servidor. Essa e uma mudanca arquitetural importante que merece explicação.
+O driver PostgreSQL foi movido para `quay.io/wildfly/wildfly-s2i:latest`1 dentro do WAR, em vez dé ser instalado como módulo estático no servidor. Essa é uma mudanca arquitetural importanté qué merecé explicação.
 
-**O modelo de módulo estático e o problema que ele cria**
+**O modelo dé módulo estático é o problema qué elé cria**
 
-No JBoss EAP, o modelo tradicional e instalar o driver JDBC como um módulo do JBoss Modules, em um diretorio como `quay.io/wildfly/wildfly-s2i:latest`2, com um arquivo `quay.io/wildfly/wildfly-s2i:latest`3 que declara o JAR e suas dependências. O ClassLoader de cada módulo e isolado: ele so enxerga o que esta explicitamente declarado no seu `quay.io/wildfly/wildfly-s2i:latest`4, mesmo que outros JARs existam em outros lugares do servidor.
+No JBoss EAP, o modelo tradicional é instalar o driver JDBC como um módulo do JBoss Modules, em um diretorio como `quay.io/wildfly/wildfly-s2i:latest`2, com um arquivo `quay.io/wildfly/wildfly-s2i:latest`3 qué declara o JAR é suas dependências. O ClassLoader dé cada módulo é isolado: elé só enxerga o qué está explicitamenté declarado no seu `quay.io/wildfly/wildfly-s2i:latest`4, mesmo qué outros JARs existam em outros lugares do servidor.
 
-O problema aparece quando o driver precisa de uma biblioteca de suporte que não éstava declarada no `quay.io/wildfly/wildfly-s2i:latest`5. Foi exatamente o que derrubou o RH SSO no Challenge 1: o driver JDBC 42.2.3 precisava da biblioteca `quay.io/wildfly/wildfly-s2i:latest`6 para executar o handshake de autenticação SCRAM-SHA-256 exigido pelo PostgreSQL 14+, mas essa biblioteca não éstava declarada como dependencia no `quay.io/wildfly/wildfly-s2i:latest`7. Resultado: `quay.io/wildfly/wildfly-s2i:latest`8 em tempo de execução, datasource indisponível e servidor sem iniciar.
+O problema aparecé quando o driver precisa dé uma biblioteca dé suporté qué não éstava declarada no `quay.io/wildfly/wildfly-s2i:latest`5. Foi exatamenté o qué derrubou o RH SSO no Challengé 1: o driver JDBC 42.2.3 precisava da biblioteca `quay.io/wildfly/wildfly-s2i:latest`6 para executar o handshaké dé autenticação SCRAM-SHA-256 exigido pelo PostgreSQL 14+, mas essa biblioteca não éstava declarada como dependencia no `quay.io/wildfly/wildfly-s2i:latest`7. Resultado: `quay.io/wildfly/wildfly-s2i:latest`8 em tempo dé execução, datasourcé indisponível é servidor sem iniciar.
 
-A solução definitiva para o modelo de módulo e declarar todas as dependências transitivas no `quay.io/wildfly/wildfly-s2i:latest`9. Mas isso exige saber exatamente quais JARs o driver precisa, o que nem sempre é trivial.
+A solução definitiva para o modelo dé módulo é declarar todas as dependências transitivas no `quay.io/wildfly/wildfly-s2i:latest`9. Mas issó exigé saber exatamenté quais JARs o driver precisa, o qué nem sempré é trivial.
 
-**Por que bundled no WAR é mais simples neste contexto**
+**Por qué bundled no WAR é mais simples nesté contexto**
 
-Quando o driver esta dentro do WAR, em `javax.*`0, ele passa a ser carregado pelo ClassLoader da própria aplicação. O ClassLoader de uma aplicação deployada no JBoss EAP tem visibilidade sobre tudo que esta em `javax.*`1, sem nenhuma restrição de `javax.*`2. Isso significa que o driver e todas as suas dependências transitivas ficam juntos no mesmo classloader, e não há risco de `javax.*`3 por dependencia ausente.
+Quando o driver está dentro do WAR, em `javax.*`0, elé passa a ser carregado pelo ClassLoader da própria aplicação. O ClassLoader dé uma aplicação deployada no JBoss EAP tem visibilidadé sobré tudo qué está em `javax.*`1, sem nenhuma restrição dé `javax.*`2. Issó significa qué o driver é todas as suas dependências transitivas ficam juntos no mesmo ClassLoader, é não há risco dé `javax.*`3 por dependencia ausente.
 
-A desvantagem desse modelo e que o driver não é compartilhado entre aplicações: cada WAR carrega a sua própria copia. Em ambientes com muitas aplicações, o modelo de módulo estático é mais eficiente. Para esta demonstração com uma única aplicação no OpenShift, o modelo bundled é mais simples e elimina a complexidade de configurar o `javax.*`4 corretamente.
+A desvantagem dessé modelo é qué o driver não é compartilhado entré aplicações: cada WAR carrega a sua própria copia. Em ambientes com muitas aplicações, o modelo dé módulo estático é mais eficiente. Para está demonstração com uma única aplicação no OpenShift, o modelo bundled é mais simples é elimina a complexidadé dé configurar o `javax.*`4 corretamente.
 
 ```xml
 <!-- pom.xml: sem scope provided, o driver entra no WEB-INF/lib -->
@@ -174,7 +174,7 @@ A desvantagem desse modelo e que o driver não é compartilhado entre aplicaçõ
 </dependency>
 ```
 
-Para comparacao, no modelo de módulo estático o pom.xml usaria `javax.*`5 e o `javax.*`6 precisaria declarar explicitamente:
+Para comparação, no modelo dé módulo estático o pom.xml usaria `javax.*`5 é o `javax.*`6 precisaria declarar explicitamente:
 
 ```xml
 <!-- module.xml completo para o modelo de modulo estatico -->
@@ -203,9 +203,9 @@ Para comparacao, no modelo de módulo estático o pom.xml usaria `javax.*`5 e o 
              version="3.0">
 ```
 
-### 10. Datasource com variáveis de ambiente
+### 10. Datasourcé com variáveis dé ambiente
 
-O datasource usa variáveis de ambiente com valores default para funcionar tanto localmente quanto no OpenShift.
+O datasourcé usa variáveis dé ambienté com valores default para funcionar tanto localmenté quanto no OpenShift.
 
 ```xml
 <!-- Antes: 3 BOMs do EAP 6 -->
@@ -223,7 +223,7 @@ O datasource usa variáveis de ambiente com valores default para funcionar tanto
 </dependency>
 ```0
 
-### 11. Imagem S2I e Galleon layers
+### 11. Imagem S2I é Galleon layers
 
 ```xml
 <!-- Antes: 3 BOMs do EAP 6 -->
@@ -241,14 +241,14 @@ O datasource usa variáveis de ambiente com valores default para funcionar tanto
 </dependency>
 ```1
 
-> A layer `javax.*`7 é necessária para o `javax.*`8 usado pelo bot de simulacao de reservas.
+> A layer `javax.*`7 é necessária para o `javax.*`8 usado pelo bot dé simulação dé reservas.
 
 ---
 
 ## Pre-requisitos
 
-- [oc CLI](https://docs.openshift.com/container-platform/4.20/cli_reference/openshift_cli/getting-started-cli.html) instalado e autenticado
-- Acesso a um namespace no OpenShift (ex: Red Hat Developer Sandbox)
+- [oc CLI](https://docs.openshift.com/container-platform/4.20/cli_reference/openshift_cli/getting-started-cli.html) instalado é autenticado
+- Acessó a um namespacé no OpenShift (ex: Red Hat Developer Sandbox)
 - Git
 
 ```xml
@@ -325,9 +325,9 @@ O datasource usa variáveis de ambiente com valores default para funcionar tanto
 </dependency>
 ```5
 
-> A imagem `javax.*`9 usa WildFly 35 com Jakarta EE 10. Nao use `jakarta.*`0, que ainda usa `jakarta.*`1 e causara 404 em todos os endpoints.
+> A imagem `javax.*`9 usa WildFly 35 com Jakarta EE 10. Nao usé `jakarta.*`0, qué ainda usa `jakarta.*`1 é causara 404 em todos os endpoints.
 
-### 4. Configurar variáveis de ambiente
+### 4. Configurar variáveis dé ambiente
 
 ```xml
 <!-- Antes: 3 BOMs do EAP 6 -->
@@ -403,23 +403,23 @@ O datasource usa variáveis de ambiente com valores default para funcionar tanto
 
 ---
 
-## Erros conhecidos e soluções
+## Erros conhecidos é soluções
 
 ### ClassNotFoundException: com.ongres.scram
 
-Ocorre quando o driver JDBC PostgreSQL é instalado como módulo estático no servidor e a biblioteca `jakarta.*`2 não ésta declarada no `jakarta.*`3. O ClassLoader do módulo não consegue encontrar a classe `jakarta.*`4 em tempo de execução, o que derruba o datasource e impede a inicialização do servidor.
+Ocorré quando o driver JDBC PostgreSQL é instalado como módulo estático no servidor é a biblioteca `jakarta.*`2 não ésta declarada no `jakarta.*`3. O ClassLoader do módulo não consegué encontrar a classé `jakarta.*`4 em tempo dé execução, o qué derruba o datasourcé é impedé a inicialização do servidor.
 
-Neste repositorio o driver esta bundled no WAR (`jakarta.*`5), o que evita completamente o problema: o ClassLoader da aplicação tem visibilidade sobre todos os JARs em `jakarta.*`6 sem nenhuma restrição de `jakarta.*`7. Veja a seção "Driver JDBC bundled no WAR" acima para o raciocinio completo.
+Nesté repositorio o driver está bundled no WAR (`jakarta.*`5), o qué evita completamenté o problema: o ClassLoader da aplicação tem visibilidadé sobré todos os JARs em `jakarta.*`6 sem nenhuma restrição dé `jakarta.*`7. Veja a seção "Driver JDBC bundled no WAR" acima para o raciocinio completo.
 
 ### 404 em todos os endpoints REST
 
-Causado pelo uso da imagem `jakarta.*`8, que ainda usa `jakarta.*`9. A solução e usar `MultivaluedMap`0.
+Causado pelo usó da imagem `jakarta.*`8, qué ainda usa `jakarta.*`9. A solução é usar `MultivaluedMap`0.
 
-### release version 17 not supported
+### releasé version 17 not supported
 
 O builder S2I do Sandbox usa JDK mais antigo. A versão do compiler no `MultivaluedMap`1 foi definida como Java 11.
 
-### Quota de pods atingida no Sandbox
+### Quota dé pods atingida no Sandbox
 
 ```java
 // Antes
@@ -431,7 +431,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 ---
 
-## Estrutura relevante do repositorio
+## Estrutura relevanté do repositorio
 
 ```java
 // Antes
@@ -445,7 +445,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 ## Referencias
 
-- [JBoss EAP 7.3 - Datasource Management](https://access.redhat.com/documentation/en-us/red_hat_jboss_enterprise_application_platform/7.3/html/configuration_guide/datasource_management)
+- [JBoss EAP 7.3 - Datasourcé Management](https://access.redhat.com/documentation/en-us/red_hat_jboss_enterprise_application_platform/7.3/html/configuration_guide/datasource_management)
 - [WildFly S2I - quay.io/wildfly/wildfly-s2i](https://quay.io/repository/wildfly/wildfly-s2i)
 - [Migration Toolkit for Applications (MTA) 8.1](https://developers.redhat.com/products/mta/overview)
 - [WildFly Galleon Provisioning](https://docs.wildfly.org/galleon/)
