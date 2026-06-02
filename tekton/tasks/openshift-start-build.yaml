@@ -1,0 +1,10 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: openshift-start-build
+spec:
+  steps:
+  - name: start-build
+    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+    script: |
+      oc start-build ticket-monster --wait --follow -n ticket-monster

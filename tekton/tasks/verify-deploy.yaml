@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: verify-deploy
+spec:
+  steps:
+  - name: verify
+    image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+    script: |
+      oc rollout status deployment/ticket-monster -n ticket-monster --timeout=120s
+      sleep 15
+      for i in 1 2 3 4 5; do
+        curl -sf http://ticket-monster.ticket-monster.svc.cluster.local:8080/ticket-monster/ \
+          && echo "Health check OK" && exit 0
+        echo "Tentativa $i falhou, aguardando 10s..."
+        sleep 10
+      done
+      echo "Health check falhou apos 5 tentativas"
+      exit 1

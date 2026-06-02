@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ticket-monster-pipeline
+spec:
+  params:
+  - name: GIT_URL
+    type: string
+    default: https://github.com/cordeirops/ticket-monster-migrate
+  - name: GIT_REVISION
+    type: string
+    default: main
+  workspaces:
+  - name: source-code
+  tasks:
+  - name: git-clone
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: source-code
+    params:
+    - name: url
+      value: $(params.GIT_URL)
+    - name: revision
+      value: $(params.GIT_REVISION)
+  - name: maven-test
+    taskRef:
+      name: maven-test
+    workspaces:
+    - name: source
+      workspace: source-code
+    runAfter:
+    - git-clone
+  - name: build-image
+    taskRef:
+      name: openshift-start-build
+    runAfter:
+    - maven-test
+  - name: verify-deploy
+    taskRef:
+      name: verify-deploy
+    runAfter:
+    - build-image

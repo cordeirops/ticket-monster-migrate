@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: maven-test
+spec:
+  workspaces:
+  - name: source
+  steps:
+  - name: run-tests
+    image: registry.access.redhat.com/ubi8/openjdk-17:latest
+    workingDir: /workspace/source/demo
+    env:
+    - name: MAVEN_OPTS
+      value: "-Xmx1g"
+    command:
+    - mvn
+    args:
+    - test
+    - -Dmaven.test.failure.ignore=false
+    - -Dquarkus.test.continuous-testing=disabled
+    - --no-transfer-progress
+    - -B
+    timeout: 15m
