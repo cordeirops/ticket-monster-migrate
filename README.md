@@ -392,3 +392,4 @@ ticket-monster-migrate/
 - [WildFly S2I - quay.io/wildfly/wildfly-s2i](https://quay.io/repository/wildfly/wildfly-s2i)
 - [Migration Toolkit for Applications (MTA) 8.1](https://developers.redhat.com/products/mta/overview)
 - [WildFly Galleon Provisioning](https://docs.wildfly.org/galleon/)
+ 
